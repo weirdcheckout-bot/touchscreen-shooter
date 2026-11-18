@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#080b18">
+<title>STARFALL — Touchscreen Shooter</title>
+<style>
+:root{color-scheme:dark;--cyan:#62f3ff;--pink:#ff5caa;--gold:#ffe28a}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080b18;color:#eff7ff;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;touch-action:none;user-select:none}
+body{background:radial-gradient(ellipse at 50% 110%,#17234a 0%,#0b1025 45%,#070a16 100%)}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block}
+.hud{position:fixed;z-index:2;top:max(12px,env(safe-area-inset-top));left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;padding:0 16px;pointer-events:none;gap:10px}
+.brand{font-size:11px;letter-spacing:.24em;font-weight:900;color:var(--cyan);text-shadow:0 0 18px #62f3ff66}
+.stats{display:flex;gap:8px}.stat{min-width:68px;padding:8px 11px;border:1px solid #ffffff20;background:#0b1434b8;backdrop-filter:blur(12px);border-radius:12px;text-align:center}
+.stat small{display:block;font-size:9px;letter-spacing:.16em;color:#93a8ca}.stat b{font-size:17px;font-variant-numeric:tabular-nums}
+#health{color:#ff79a8}.bottom{position:fixed;z-index:3;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));display:flex;justify-content:space-between;align-items:end;padding:0 20px;pointer-events:none}
+.pad{width:116px;height:116px;border-radius:50%;border:1px solid #8befff55;background:#a4eaff0b;box-shadow:inset 0 0 28px #4bdcff12;position:relative;pointer-events:auto;touch-action:none}
+.pad:before{content:"";position:absolute;inset:35px;border:1px dashed #8befff35;border-radius:50%}
+.knob{position:absolute;width:48px;height:48px;left:34px;top:34px;border-radius:50%;background:linear-gradient(145deg,#b6fbff,#35b8d6);box-shadow:0 0 24px #42dfff88;pointer-events:none}
+.fire{pointer-events:auto;width:88px;height:88px;border-radius:50%;border:1px solid #ff8fc4aa;background:radial-gradient(circle at 35% 25%,#ffb0d4,#ff4e91 70%);color:white;font-weight:1000;letter-spacing:.1em;box-shadow:0 0 34px #ff4e9166,inset 0 2px 8px #fff8;touch-action:none}
+.fire:active{transform:scale(.94)}.hint{position:fixed;bottom:145px;left:0;right:0;text-align:center;color:#8295b9;font-size:10px;letter-spacing:.13em;pointer-events:none}
+.overlay{position:fixed;z-index:5;inset:0;display:grid;place-items:center;padding:24px;background:#050817a8;backdrop-filter:blur(10px)}
+.panel{width:min(420px,100%);text-align:center;padding:30px 24px;border:1px solid #7beeff45;border-radius:24px;background:linear-gradient(160deg,#17234beF,#0b1025f5);box-shadow:0 25px 100px #0009}
+.kicker{font-size:10px;letter-spacing:.3em;color:var(--cyan);font-weight:900}.panel h1{font-size:clamp(38px,12vw,60px);line-height:.95;margin:14px 0 12px;letter-spacing:-.06em}.panel p{color:#a9bad7;line-height:1.6;font-size:13px}
+.start{border:0;border-radius:14px;padding:15px 28px;margin-top:12px;background:linear-gradient(90deg,#45d9ef,#7d9dff);color:#071022;font-weight:1000;letter-spacing:.12em;font-size:13px;box-shadow:0 8px 30px #45d9ef44}
+#pause{pointer-events:auto;border:1px solid #ffffff30;background:#0b1434cc;color:white;border-radius:10px;padding:7px 10px;font-weight:800}
+.hidden{display:none!important}
+@media(min-width:800px){.bottom{padding:0 7vw}.pad{width:130px;height:130px}.knob{left:40px;top:40px}.hint{bottom:160px}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="hud"><div><div class="brand">✦ STARFALL</div><button id="pause">Ⅱ PAUSE</button></div><div class="stats"><div class="stat"><small>SCORE</small><b id="score">0000</b></div><div class="stat"><small>WAVE</small><b id="wave">1</b></div><div class="stat"><small>HULL</small><b id="health">♥♥♥</b></div></div></div>
+<div class="hint" id="hint">MOVE WITH LEFT STICK · HOLD FIRE TO SHOOT</div>
+<div class="bottom"><div class="pad" id="pad"><div class="knob" id="knob"></div></div><button class="fire" id="fire">FIRE</button></div>
+<div class="overlay" id="overlay"><div class="panel"><div class="kicker">ARCADE SPACE COMBAT</div><h1 id="headline">STARFALL</h1><p id="message">The sector is swarming. Pilot your ship, dodge incoming fire, and survive as many waves as you can.</p><p>✦ Touch controls · Keyboard supported<br>WASD / arrows to move · Space to fire · P to pause</p><button class="start" id="start">LAUNCH MISSION</button></div></div>
+<script>
+(()=>{
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+let W=0,H=0,dpr=1,last=0,elapsed=0,score=0,wave=1,lives=3,running=false,paused=false,over=false,spawn=0,fireClock=0,shake=0;
+let stars=[],bullets=[],foes=[],sparks=[],drops=[];
+const player={x:0,y:0,r:14,speed:270,inv:0};
+const input={x:0,y:0,fire:false,keys:{}};
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(dpr,0,0,dpr,0,0);if(!player.x){player.x=W/2;player.y=H*.76}stars=Array.from({length:Math.floor(W*H/6500)},()=>({x:Math.random()*W,y:Math.random()*H,z:.3+Math.random()*.9,r:.5+Math.random()*1.5}));}
+addEventListener('resize',resize);resize();
+function reset(){score=0;wave=1;lives=3;elapsed=0;spawn=0;bullets=[];foes=[];sparks=[];drops=[];player.x=W/2;player.y=H*.76;player.inv=1.5;over=false;paused=false;running=true;updateHud();$('overlay').classList.add('hidden');}
+function updateHud(){$('score').textContent=String(score).padStart(4,'0');$('wave').textContent=wave;$('health').textContent='♥'.repeat(lives)+'♡'.repeat(3-lives);}
+function burst(x,y,color,n=12){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=40+Math.random()*210;sparks.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.35+Math.random()*.55,max:.9,color,r:1+Math.random()*3});}}
+function shoot(){bullets.push({x:player.x,y:player.y-17,vy:-590,r:4});}
+function enemy(){let tough=wave>=3&&Math.random()<.22;foes.push({x:28+Math.random()*(W-56),y:-28,vx:(Math.random()-.5)*55,vy:75+Math.random()*45+wave*9,r:tough?18:12,hp:tough?3:1,max:tough?3:1,t:tough?'heavy':'normal',phase:Math.random()*6});}
+function step(dt){elapsed+=dt;shake=Math.max(0,shake-dt*24);stars.forEach(s=>{s.y+=((25+s.z*70)+wave*3)*dt;if(s.y>H){s.y=0;s.x=Math.random()*W}});
+let dx=input.x+(input.keys.ArrowRight||input.keys.d?1:0)-(input.keys.ArrowLeft||input.keys.a?1:0),dy=input.y+(input.keys.ArrowDown||input.keys.s?1:0)-(input.keys.ArrowUp||input.keys.w?1:0);let m=Math.hypot(dx,dy)||1;player.x=Math.max(18,Math.min(W-18,player.x+dx/m*player.speed*dt));player.y=Math.max(65,Math.min(H-35,player.y+dy/m*player.speed*dt));player.inv=Math.max(0,player.inv-dt);
+fireClock-=dt;if((input.fire||input.keys[' '])&&fireClock<=0){shoot();fireClock=.17}
+spawn-=dt;if(spawn<=0){enemy();spawn=Math.max(.28,1.05-wave*.055)*(0.65+Math.random()*.7)}
+bullets.forEach(b=>b.y+=b.vy*dt);bullets=bullets.filter(b=>b.y>-20);
+foes.forEach(e=>{e.y+=e.vy*dt;e.x+=Math.sin(elapsed*1.8+e.phase)*e.vx*dt;if(e.y>H+40)e.dead=true;
+for(const b of bullets){if(!b.dead&&Math.hypot(b.x-e.x,b.y-e.y)<e.r+4){b.dead=true;e.hp--;burst(b.x,b.y,'#6cf4ff',3);if(e.hp<=0){e.dead=true;score+=e.max===3?35:10;burst(e.x,e.y,e.t==='heavy'?'#ffbc75':'#ff5ca8',e.t==='heavy'?24:13);if(Math.random()<.09)drops.push({x:e.x,y:e.y,r:9});}}}
+if(player.inv<=0&&Math.hypot(player.x-e.x,player.y-e.y)<player.r+e.r){e.dead=true;hitPlayer();}
+});bullets=bullets.filter(b=>!b.dead);foes=foes.filter(e=>!e.dead);
+drops.forEach(d=>{d.y+=100*dt;if(Math.hypot(d.x-player.x,d.y-player.y)<25){d.dead=true;lives=Math.min(3,lives+1);burst(d.x,d.y,'#ffe28a',15);updateHud()}});drops=drops.filter(d=>!d.dead&&d.y<H+20);
+sparks.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.pow(.08,dt);p.vy*=Math.pow(.08,dt);p.life-=dt});sparks=sparks.filter(p=>p.life>0);
+let next=1+Math.floor(score/180);if(next>wave){wave=next;burst(W/2,H*.35,'#62f3ff',30)}updateHud();
+}
+function hitPlayer(){lives--;player.inv=1.5;shake=10;burst(player.x,player.y,'#62eaff',24);updateHud();if(lives<=0)endGame();}
+function endGame(){running=false;over=true;$('headline').textContent='SHIP LOST';$('message').innerHTML='Final score: <b style="color:#62f3ff">'+score+'</b><br>You reached wave '+wave+'. Ready for another run?';$('start').textContent='PLAY AGAIN';$('overlay').classList.remove('hidden')}
+function draw(){ctx.clearRect(0,0,W,H);ctx.save();if(shake)ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);
+stars.forEach(s=>{ctx.globalAlpha=.25+s.z*.55;ctx.fillStyle='#a9eaff';ctx.fillRect(s.x,s.y,s.r,s.r*2.4)});ctx.globalAlpha=1;
+bullets.forEach(b=>{ctx.shadowBlur=14;ctx.shadowColor='#62f3ff';ctx.fillStyle='#c5fbff';ctx.fillRect(b.x-2,b.y-9,4,15)});ctx.shadowBlur=0;
+foes.forEach(e=>{ctx.save();ctx.translate(e.x,e.y);ctx.shadowBlur=18;ctx.shadowColor=e.t==='heavy'?'#ffbd65':'#ff5caa';ctx.fillStyle=e.t==='heavy'?'#ffbd65':'#ff5caa';ctx.beginPath();ctx.moveTo(0,e.r);ctx.lineTo(-e.r,e.r*.1);ctx.lineTo(-e.r*.65,-e.r*.75);ctx.lineTo(0,-e.r*.35);ctx.lineTo(e.r*.65,-e.r*.75);ctx.lineTo(e.r,e.r*.1);ctx.closePath();ctx.fill();ctx.shadowBlur=0;if(e.max>1){ctx.fillStyle='#26304b';ctx.fillRect(-e.r,-e.r-8,e.r*2,3);ctx.fillStyle='#ffe28a';ctx.fillRect(-e.r,-e.r-8,e.r*2*e.hp/e.max,3)}ctx.restore()});
+drops.forEach(d=>{ctx.shadowBlur=18;ctx.shadowColor='#ffe28a';ctx.fillStyle='#ffe28a';ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0});
+sparks.forEach(p=>{ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,p.r,p.r)});ctx.globalAlpha=1;
+if(player.inv<=0||Math.floor(elapsed*12)%2===0){ctx.save();ctx.translate(player.x,player.y);ctx.shadowBlur=25;ctx.shadowColor='#62f3ff';ctx.fillStyle='#62f3ff';ctx.beginPath();ctx.moveTo(0,-20);ctx.lineTo(14,14);ctx.lineTo(0,8);ctx.lineTo(-14,14);ctx.closePath();ctx.fill();ctx.fillStyle='#eaffff';ctx.beginPath();ctx.moveTo(0,-11);ctx.lineTo(4,7);ctx.lineTo(-4,7);ctx.fill();ctx.fillStyle='#ffb36a';ctx.beginPath();ctx.moveTo(-5,14);ctx.lineTo(0,25+Math.random()*7);ctx.lineTo(5,14);ctx.fill();ctx.restore()}ctx.restore();
+}
+function loop(t){let dt=Math.min((t-last)/1000||0,.033);last=t;if(running&&!paused)step(dt);draw();requestAnimationFrame(loop)}requestAnimationFrame(loop);
+$('start').addEventListener('click',reset);$('pause').addEventListener('click',()=>{if(!running)return;paused=!paused;$('pause').textContent=paused?'▶ RESUME':'Ⅱ PAUSE';if(paused){$('headline').textContent='PAUSED';$('message').textContent='Take a breath, pilot. The sector is waiting.';$('start').textContent='RESUME';$('overlay').classList.remove('hidden')}else $('overlay').classList.add('hidden')});
+$('start').addEventListener('click',()=>{if(running&&paused){paused=false;$('pause').textContent='Ⅱ PAUSE';$('overlay').classList.add('hidden')}});
+const pad=$('pad'),knob=$('knob');let active=null;
+function stick(e){const r=pad.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let x=e.clientX-cx,y=e.clientY-cy,l=Math.hypot(x,y),max=42;if(l>max){x=x/l*max;y=y/l*max}input.x=x/max;input.y=y/max;knob.style.transform='translate('+x+'px,'+y+'px)'}
+pad.addEventListener('pointerdown',e=>{active=e.pointerId;pad.setPointerCapture(active);stick(e)});pad.addEventListener('pointermove',e=>{if(e.pointerId===active)stick(e)});function release(){active=null;input.x=0;input.y=0;knob.style.transform='translate(0,0)'}pad.addEventListener('pointerup',release);pad.addEventListener('pointercancel',release);
+const fire=$('fire');fire.addEventListener('pointerdown',e=>{e.preventDefault();input.fire=true;fire.setPointerCapture(e.pointerId)});fire.addEventListener('pointerup',()=>input.fire=false);fire.addEventListener('pointercancel',()=>input.fire=false);fire.addEventListener('lostpointercapture',()=>input.fire=false);
+addEventListener('keydown',e=>{input.keys[e.key.toLowerCase()]=true;input.keys[e.key]=true;if(e.key===' '||e.key.startsWith('Arrow'))e.preventDefault();if(e.key.toLowerCase()==='p'&&running)$('pause').click()});addEventListener('keyup',e=>{input.keys[e.key.toLowerCase()]=false;input.keys[e.key]=false});
+document.addEventListener('contextmenu',e=>e.preventDefault());
+})();
+</script>
+</body></html>
