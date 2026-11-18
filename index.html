@@ -17,7 +17,7 @@
 <script>
 (()=>{'use strict';
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),$=id=>document.getElementById(id);
-let W=0,H=0,D=1,last=0,time=0,camera=0,score=0,hearts=3,level=1,unlocked=1,running=false,paused=false,shake=0,world=0;
+let W=0,H=0,D=1,last=0,time=0,camera=0,score=0,hearts=3,level=1,unlocked=(()=>{try{return Math.max(1,Math.min(50,Number(localStorage.getItem('veyra-unlocked'))||1))}catch(e){return 1}})(),running=false,paused=false,shake=0,world=0;
 const player={x:40,y:0,w:25,h:38,vx:0,vy:0,ground:false,inv:0,face:1},input={x:0,jump:false},keys={},parts=[];
 let platforms=[],spikes=[],gems=[],enemies=[],goal=null,wasJump=false;
 const palettes=[['#111a2b','#293f55','#6ee7d2'],['#20162e','#49304d','#f49bc2'],['#111f30','#264c59','#8be4ff'],['#251c35','#59436e','#c5a4ff'],['#18271f','#365541','#b9f28a']];
@@ -44,7 +44,7 @@ for(const s of spikes)if(hit({x:player.x+5,y:player.y+6,w:player.w-10,h:player.h
 if(player.y>H+90)loseLife();
 for(const g of gems)if(!g.got&&Math.hypot(player.x+12-g.x,player.y+18-g.y)<25){g.got=true;score++;particles(g.x,g.y,'#ffe49a',10);updateHud()}
 for(const p of parts){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.pow(.08,dt);p.vy=p.vy*Math.pow(.08,dt)+190*dt;p.life-=dt}for(let i=parts.length-1;i>=0;i--)if(parts[i].life<=0)parts.splice(i,1);
-camera=Math.max(0,Math.min(world-W+60,player.x-W*.32));if(player.x>goal.x+10){running=false;unlocked=Math.max(unlocked,Math.min(50,level+1));if(level===50){showPanel('VEYRA SAVED!','You conquered all 50 levels and restored the Crystal Wilds. You are a legend.','PLAY AGAIN')}else{showPanel('LEVEL '+level+' COMPLETE','Beautiful work. '+(50-level)+' levels remain. Your next world is ready.','NEXT LEVEL')} }}
+camera=Math.max(0,Math.min(world-W+60,player.x-W*.32));if(player.x>goal.x+10){running=false;unlocked=Math.max(unlocked,Math.min(50,level+1));try{localStorage.setItem('veyra-unlocked',String(unlocked))}catch(e){}if(level===50){showPanel('VEYRA SAVED!','You conquered all 50 levels and restored the Crystal Wilds. You are a legend.','PLAY AGAIN')}else{showPanel('LEVEL '+level+' COMPLETE','Beautiful work. '+(50-level)+' levels remain. Your next world is ready.','NEXT LEVEL')} }}
 function draw(){let pal=palettes[Math.floor((level-1)/10)%palettes.length],bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,pal[0]);bg.addColorStop(1,pal[1]);ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);for(let i=0;i<70;i++){let x=(i*173-camera*.12+W*100)%W,y=(i*97)%Math.max(1,H*.7);ctx.globalAlpha=.25+(i%4)*.1;ctx.fillStyle='#e9f5ff';ctx.fillRect(x,y,1.5,1.5)}ctx.globalAlpha=1;
 ctx.save();if(shake)ctx.translate((Math.random()-.5)*shake,0);ctx.translate(-camera,0);
 for(const p of platforms){let g=ctx.createLinearGradient(0,p.y,0,p.y+p.h);g.addColorStop(0,'#a6b4c4');g.addColorStop(.09,pal[2]);g.addColorStop(.1,'#39485d');g.addColorStop(1,'#172337');ctx.fillStyle=g;ctx.fillRect(p.x,p.y,p.w,p.h);ctx.shadowBlur=13;ctx.shadowColor=pal[2];ctx.fillStyle=pal[2];ctx.fillRect(p.x,p.y,p.w,4);ctx.shadowBlur=0;for(let k=0;k<p.w/36;k++){ctx.globalAlpha=.2;ctx.fillStyle='#fff';ctx.fillRect(p.x+k*36+8,p.y+22+(k%2)*12,10,2);ctx.globalAlpha=1}}
