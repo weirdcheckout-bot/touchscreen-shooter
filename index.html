@@ -61,7 +61,7 @@ for(const b of shots){b.x+=b.vx*dt;b.life-=dt;for(const e of enemies){if(e.alive
 for(const e of enemies){if(!e.alive)continue;e.x+=e.dir*42*dt;if(Math.abs(e.x-e.home)>65)e.dir*=-1;if(Math.abs(player.x-e.x)<25&&Math.abs(player.y-e.y)<30)damage();}
 for(const c of crystals){if(!c.got&&Math.hypot(player.x+12-c.x,player.y+18-c.y)<27){c.got=true;score++;burst(c.x,c.y,'#ffe58a',12);hud();}}
 for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.pow(.12,dt);p.vy=p.vy*Math.pow(.12,dt)+250*dt;p.life-=dt;}particles=particles.filter(p=>p.life>0);
-if(player.x>worldEnd-260)finish(true);
+if(player.x>worldEnd-100)finish(true);
 stars.forEach(s=>{s.y+=s.z*7;if(s.y>H)s.y=0;});
 }
 function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);}
